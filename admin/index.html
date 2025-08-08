@@ -2,67 +2,35 @@
 <html>
 <head><meta charset="utf-8"><title>Admin</title></head>
 <body>
-<h1>Admin upload</h1>
-<input id="user" placeholder="admin user">
-<input id="pass" placeholder="admin pass" type="password">
-<br><br>
-<input type="file" id="file" accept="image/*" multiple>
-<input type="text" id="title" placeholder="Title (optional)">
-<button id="go">Upload</button>
+<h1>Upload Photo</h1>
+<input id="user" placeholder="User">
+<input id="pass" type="password" placeholder="Password"><br><br>
+<input type="file" id="file" multiple>
+<button id="upload">Upload</button>
 <pre id="log"></pre>
-
 <script>
 const WORKER_URL = "https://gallery-signer.ww-ee7.workers.dev";
 
-function log(t){document.getElementById('log').textContent += t+"\n";}
-function authHeaders(){
-  const u = document.getElementById('user').value;
-  const p = document.getElementById('pass').value;
-  return { 'Authorization': 'Basic ' + btoa(u+':'+p), 'Content-Type':'application/json' };
-}
-function safeName(name){
-  return name.normalize('NFKD').replace(/[^\w.\-]+/g,'-').replace(/-+/g,'-').toLowerCase();
-}
+function log(msg){ document.getElementById('log').textContent += msg + "\n"; }
 
-document.getElementById('go').onclick = async () => {
-  const files = document.getElementById('file').files;
-  if (!files.length) return alert('Выбери файл');
-  for (const file of files) {
-    const fileName = Date.now() + '-' + safeName(file.name);
-    // 1) берём uploadUrl у воркера
-    const s = await fetch(WORKER_URL+'/sign-upload', {
-      method:'POST', headers: authHeaders(), body: JSON.stringify({ fileName, contentType: file.type })
-    }).then(r=>r.json());
+document.getElementById('upload').onclick = async () => {
+  const file = document.getElementById('file').files[0];
+  if (!file) return alert("Pick a file first");
 
-    // 2) заливаем в B2
-    const up = await fetch(s.uploadUrl, {
-      method:'POST',
-      headers:{
-        Authorization: s.uploadAuthToken,
-        'X-Bz-File-Name': fileName,            // без encodeURIComponent!
-        'Content-Type': file.type || 'b2/x-auto',
-        'X-Bz-Content-Sha1': 'do_not_verify'   // простота; можно посчитать sha1 через crypto.subtle
-      },
-      body:file
-    });
-    if (!up.ok) { log('Upload error: '+await up.text()); continue; }
-    const b2 = await up.json();
+  const formData = new FormData();
+  formData.append("file", file);
 
-    // 3) финализируем (пишем строку в Supabase)
-    const meta = {
-      fileName,
-      fileId: b2.fileId,
-      size: Number(b2.contentLength),
-      width: null, height: null,
-      title: document.getElementById('title').value || null,
-      tags: null
-    };
-    const fin = await fetch(WORKER_URL+'/finalize', {
-      method:'POST', headers: authHeaders(), body: JSON.stringify(meta)
-    }).then(r=>r.json());
+  const auth = 'Basic ' + btoa(document.getElementById('user').value + ':' + document.getElementById('pass').value);
 
-    log('OK: ' + (fin?.row?.file_url || fileName));
-  }
+  const res = await fetch(WORKER_URL + "/upload", {
+    method: "POST",
+    headers: { Authorization: auth },
+    body: formData
+  });
+
+  const data = await res.json();
+  if (data.ok) log("Uploaded: " + data.fileUrl);
+  else log("Error: " + JSON.stringify(data));
 };
 </script>
 </body>
