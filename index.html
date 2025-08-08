@@ -1,1 +1,30 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Gallery</title>
+<style>img{max-width:240px;height:auto;margin:8px;border-radius:8px}</style></head>
+<body>
+<h1>My Gallery</h1>
+<div id="g"></div>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://cdmjrustiueuswnqknuk.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkbWpydXN0aXVldXN3bnFrbnVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2MDU4NjQsImV4cCI6MjA3MDE4MTg2NH0.JZ5jgRrGRCoybkgOI9VZXTFUiAmFzlJ1oTYLUgixchQ";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+(async () => {
+  const { data, error } = await sb.from('photos')
+    .select('id,title,file_url,created_at')
+    .eq('published', true)
+    .order('created_at', { ascending:false })
+    .limit(1000);
+  if (error) { document.body.innerHTML = 'Error loading'; return; }
+  const g = document.getElementById('g');
+  data.forEach(r => {
+    const fig = document.createElement('figure');
+    fig.innerHTML = `<img loading="lazy" src="${r.file_url}"><figcaption>${r.title||''}</figcaption>`;
+    g.appendChild(fig);
+  });
+})();
+</script>
+</body>
+</html>
